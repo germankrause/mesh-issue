@@ -3,6 +3,9 @@ const express = require("express");
 const { processConfig } = require("@graphql-mesh/config");
 const { getMesh } = require("@graphql-mesh/runtime");
 const { graphqlHTTP } = require("express-graphql");
+const ws = require("ws");
+const { useServer } = require("graphql-ws/lib/use/ws");
+const { execute, subscribe } = require("graphql");
 
 async function start() {
   // wait for the source to start serving
@@ -26,14 +29,28 @@ async function start() {
   const httpServer = createServer(app);
   const router = express.Router();
   router.use(
-    "/api",
+    "/graphql",
     graphqlHTTP({
       schema,
       graphiql: { headerEditorEnabled: true },
     })
   );
   app.use(router);
-  httpServer.listen(3001, () => {
+
+  const wsServer = new ws.Server({
+    server: httpServer,
+    path: "/graphql",
+  });
+
+  app.listen(3001, () => {
+    useServer(
+      {
+        schema,
+        execute,
+        subscribe,
+      },
+      wsServer
+    );
     console.log("gateway is listening on http://localhost:3001");
   });
 }
