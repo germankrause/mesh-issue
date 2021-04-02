@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "start": "concurrently --kill-others-on-fail 'node source.js' 'node gateway.js'"
+    "start": "node gateway.js"
   },
   "dependencies": {
     "@graphql-mesh/config": "0.11.19",

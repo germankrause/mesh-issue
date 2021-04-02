@@ -3,30 +3,40 @@ const express = require("express");
 const { processConfig } = require("@graphql-mesh/config");
 const { getMesh } = require("@graphql-mesh/runtime");
 const { graphqlHTTP } = require("express-graphql");
-const ws = require("ws");
-const { useServer } = require("graphql-ws/lib/use/ws");
-const { execute, subscribe } = require("graphql");
+
+const reducePath = (path, result = '') => {
+  if (!path) return null;
+  result = `${path.key}.${result}`;
+  if (path.prev) return reducePath(path.prev, result);
+  return result.replace(/\.$/, '');
+};
 
 async function start() {
-  // wait for the source to start serving
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
   const meshConfig = await processConfig({
     sources: [
       {
-        name: "source",
+        name: "covid",
         handler: {
           graphql: {
-            endpoint: "http://localhost:3002/graphql",
+            endpoint: "https://covid-19-two-rust.vercel.app/api/graphql",
           },
         },
       },
     ],
   });
-  const { schema } = await getMesh(meshConfig);
+  const { schema, pubsub } = await getMesh(meshConfig);
+
+  pubsub.subscribe("resolverCalled", (data) => {
+    console.log("resolverCalled", reducePath(data.resolverData.info.path));
+  });
+  pubsub.subscribe("resolverDone", (data) => {
+    console.log("resolverDone", reducePath(data.resolverData.info.path));
+  });
+  pubsub.subscribe("resolverError", (data) => {
+    console.log("resolverError", reducePath(data.resolverData.info.path));
+  });
 
   const app = express();
-  const httpServer = createServer(app);
   const router = express.Router();
   router.use(
     "/graphql",
@@ -37,21 +47,8 @@ async function start() {
   );
   app.use(router);
 
-  const wsServer = new ws.Server({
-    server: httpServer,
-    path: "/graphql",
-  });
-
-  app.listen(3001, () => {
-    useServer(
-      {
-        schema,
-        execute,
-        subscribe,
-      },
-      wsServer
-    );
-    console.log("gateway is listening on http://localhost:3001");
+  app.listen(3000, () => {
+    console.log("gateway is listening on http://localhost:3000/graphql");
   });
 }
 
